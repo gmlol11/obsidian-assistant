@@ -43,7 +43,7 @@ class VaultPolicy:
             allowed_roots.append(resolved)
         self.allowed_roots = tuple(allowed_roots)
 
-    def resolve_new_markdown(self, relative_path: PurePosixPath | str) -> Path:
+    def resolve_markdown(self, relative_path: PurePosixPath | str) -> Path:
         raw_path = str(relative_path)
         if "\\" in raw_path:
             raise VaultPolicyError("Path must use forward slashes")
@@ -66,6 +66,10 @@ class VaultPolicy:
             raise VaultPolicyError("Target escapes the vault root")
         if not any(_is_within(allowed_root, target) for allowed_root in self.allowed_roots):
             raise VaultPolicyError("Target is outside allowed write directories")
+        return target
+
+    def resolve_new_markdown(self, relative_path: PurePosixPath | str) -> Path:
+        target = self.resolve_markdown(relative_path)
         if os.path.lexists(target):
-            raise ExistingTargetError(f"Target already exists: {path}")
+            raise ExistingTargetError(f"Target already exists: {relative_path}")
         return target

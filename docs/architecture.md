@@ -15,7 +15,7 @@ flowchart TB
     Owner["Владелец"]
     Telegram["Telegram Bot API"]
     OpenClaw["OpenClaw Gateway"]
-    Queue["Ограниченный контракт запросов"]
+    Queue["Локальная файловая очередь"]
     Worker["Vault Worker"]
     Vault["Obsidian vault"]
     LLM["LLM provider"]
@@ -47,25 +47,44 @@ flowchart TB
 - загрузку конфигурации;
 - диагностику;
 - безопасное разрешение пути;
-- создание новой входящей Markdown-заметки.
+- создание новой входящей Markdown-заметки;
+- идемпотентную обработку очереди и восстановление после сбоя.
 
 ### Контракт запросов
 
-Будущий контракт должен быть версионированным и содержать минимум:
+Контракт `capture.text` версии 1 содержит:
 
 ```json
 {
   "schema_version": 1,
-  "request_id": "uuid",
-  "actor_id": "telegram-user-id",
-  "operation": "capture_text",
-  "target": "00 Inbox",
-  "payload": {},
-  "created_at": "RFC3339 timestamp"
+  "request_id": "12345678-1234-5678-1234-567812345678",
+  "event_type": "capture.text",
+  "source": "local",
+  "actor_id": "local-owner",
+  "created_at": "2026-07-16T09:30:00.000000Z",
+  "payload": {
+    "title": "Тестовая идея",
+    "text": "Обезличенный тестовый материал"
+  }
 }
 ```
 
-Полный текст может находиться в payload, но не должен автоматически копироваться в лог. Для первой серверной версии предпочтительна локальная очередь файлов или Unix socket: они позволяют не открывать сетевой порт Vault Worker.
+Полный текст находится в payload только в состояниях `pending`, `processing` и `quarantine` и не копируется в обычный лог. После успеха событие заменяется квитанцией с fingerprint и относительным путём заметки. Очередь хранится в `OBSIDIAN_RUNTIME_PATH` вне vault и не открывает сетевой порт Vault Worker. Подробная схема: [capture-queue.md](capture-queue.md).
+
+### Жизненный цикл очереди
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: enqueue
+    pending --> processing: claim + lease
+    processing --> completed: create-only write
+    processing --> pending: временная ошибка
+    processing --> quarantine: постоянная ошибка или лимит попыток
+    quarantine --> pending: ручной retry
+    processing --> pending: recovery просроченного lease
+```
+
+`request_id` и SHA-256 канонического события защищают от повторной доставки с другим содержимым. Один файловый lock сериализует изменение состояния на одном Mac mini. Это не распределённая очередь и не предназначено для нескольких серверов с общим сетевым диском.
 
 ### Obsidian vault
 

@@ -7,8 +7,10 @@ services:
         required: false
     environment:
       OBSIDIAN_VAULT_PATH: /vault
+      OBSIDIAN_RUNTIME_PATH: /runtime
     volumes:
       - "${HOST_VAULT_PATH:-./tests/fixtures/vault}:/vault"
+      - "${HOST_RUNTIME_PATH:-./runtime}:/runtime"
     network_mode: none
     read_only: true
     tmpfs:

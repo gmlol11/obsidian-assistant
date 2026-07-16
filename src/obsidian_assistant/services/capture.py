@@ -28,6 +28,24 @@ class CaptureCommand:
     source: str = "local"
 
 
+def normalize_capture_command(command: CaptureCommand) -> CaptureCommand:
+    title = " ".join(command.title.split())
+    text = command.text.strip()
+    source = command.source.strip().lower()
+
+    if not title:
+        raise CaptureError("Title cannot be empty")
+    if len(title) > _MAX_TITLE_LENGTH:
+        raise CaptureError(f"Title cannot exceed {_MAX_TITLE_LENGTH} characters")
+    if not text:
+        raise CaptureError("Text cannot be empty")
+    if len(text) > _MAX_TEXT_LENGTH:
+        raise CaptureError(f"Text cannot exceed {_MAX_TEXT_LENGTH} characters")
+    if not _SOURCE.fullmatch(source):
+        raise CaptureError("Source must contain lowercase letters, digits, hyphens, or underscores")
+    return CaptureCommand(title=title, text=text, source=source)
+
+
 class CaptureService:
     def __init__(
         self,
@@ -42,30 +60,38 @@ class CaptureService:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.id_factory = id_factory or uuid.uuid4
 
-    def capture(self, command: CaptureCommand, *, force_apply: bool = False) -> WriteResult:
-        title = " ".join(command.title.split())
-        text = command.text.strip()
-        source = command.source.strip().lower()
-
-        if not title:
-            raise CaptureError("Title cannot be empty")
-        if len(title) > _MAX_TITLE_LENGTH:
-            raise CaptureError(f"Title cannot exceed {_MAX_TITLE_LENGTH} characters")
-        if not text:
-            raise CaptureError("Text cannot be empty")
-        if len(text) > _MAX_TEXT_LENGTH:
-            raise CaptureError(f"Text cannot exceed {_MAX_TEXT_LENGTH} characters")
-        if not _SOURCE.fullmatch(source):
-            raise CaptureError("Source must contain lowercase letters, digits, hyphens, or underscores")
-
-        now = self.clock().astimezone(timezone.utc)
-        capture_id = self.id_factory()
+    def capture(
+        self,
+        command: CaptureCommand,
+        *,
+        force_apply: bool = False,
+        capture_id: uuid.UUID | None = None,
+        created_at: datetime | None = None,
+        allow_identical_existing: bool = False,
+    ) -> WriteResult:
+        normalized = normalize_capture_command(command)
+        raw_now = created_at or self.clock()
+        if raw_now.tzinfo is None:
+            raise CaptureError("created_at must include a timezone")
+        now = raw_now.astimezone(timezone.utc)
+        effective_capture_id = capture_id or self.id_factory()
         timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
-        filename = f"{timestamp}-{capture_id.hex[:8]}.md"
+        filename = f"{timestamp}-{effective_capture_id.hex}.md"
         relative_path = self.settings.inbox_dir / filename
-        content = self._render_markdown(title, text, source, capture_id, now)
+        content = self._render_markdown(
+            normalized.title,
+            normalized.text,
+            normalized.source,
+            effective_capture_id,
+            now,
+        )
         should_apply = force_apply or not self.settings.dry_run
-        return self.writer.create_markdown(relative_path, content, apply=should_apply)
+        return self.writer.create_markdown(
+            relative_path,
+            content,
+            apply=should_apply,
+            allow_identical_existing=allow_identical_existing,
+        )
 
     @staticmethod
     def _render_markdown(

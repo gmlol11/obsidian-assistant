@@ -49,6 +49,16 @@ def _parse_bool(value: str, key: str) -> bool:
     raise ConfigError(f"{key} must be true or false")
 
 
+def _parse_positive_int(value: str, key: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ConfigError(f"{key} must be a positive integer") from exc
+    if parsed < 1:
+        raise ConfigError(f"{key} must be a positive integer")
+    return parsed
+
+
 def _relative_directory(value: str, key: str) -> PurePosixPath:
     if "\\" in value:
         raise ConfigError(f"{key} must use forward slashes")
@@ -72,10 +82,13 @@ def _contains_path(parent: PurePosixPath, child: PurePosixPath) -> bool:
 class Settings:
     environment: str
     vault_path: Path
+    runtime_path: Path
     inbox_dir: PurePosixPath
     allowed_write_dirs: tuple[PurePosixPath, ...]
     dry_run: bool
     log_level: str
+    queue_max_attempts: int
+    queue_lease_seconds: int
     telegram_configured: bool
     openai_configured: bool
     llm_provider: str
@@ -96,6 +109,20 @@ class Settings:
         if not vault_path.is_absolute():
             vault_path = working_dir / vault_path
         vault_path = vault_path.resolve(strict=False)
+
+        raw_runtime_path = values.get("OBSIDIAN_RUNTIME_PATH", "./runtime").strip()
+        if not raw_runtime_path:
+            raise ConfigError("OBSIDIAN_RUNTIME_PATH cannot be empty")
+        runtime_path = Path(raw_runtime_path).expanduser()
+        if not runtime_path.is_absolute():
+            runtime_path = working_dir / runtime_path
+        runtime_path = runtime_path.resolve(strict=False)
+        if (
+            runtime_path == vault_path
+            or vault_path in runtime_path.parents
+            or runtime_path in vault_path.parents
+        ):
+            raise ConfigError("OBSIDIAN_RUNTIME_PATH must be outside the Obsidian vault")
 
         inbox_dir = _relative_directory(
             values.get("OBSIDIAN_INBOX_DIR", "00 Inbox"),
@@ -124,10 +151,19 @@ class Settings:
         return cls(
             environment=environment,
             vault_path=vault_path,
+            runtime_path=runtime_path,
             inbox_dir=inbox_dir,
             allowed_write_dirs=allowed_write_dirs,
             dry_run=_parse_bool(values.get("OBSIDIAN_DRY_RUN", "true"), "OBSIDIAN_DRY_RUN"),
             log_level=log_level,
+            queue_max_attempts=_parse_positive_int(
+                values.get("OBSIDIAN_QUEUE_MAX_ATTEMPTS", "3"),
+                "OBSIDIAN_QUEUE_MAX_ATTEMPTS",
+            ),
+            queue_lease_seconds=_parse_positive_int(
+                values.get("OBSIDIAN_QUEUE_LEASE_SECONDS", "300"),
+                "OBSIDIAN_QUEUE_LEASE_SECONDS",
+            ),
             telegram_configured=bool(values.get("TELEGRAM_BOT_TOKEN", "").strip()),
             openai_configured=bool(values.get("OPENAI_API_KEY", "").strip()),
             llm_provider=values.get("LLM_PROVIDER", "disabled").strip() or "disabled",
@@ -139,10 +175,13 @@ class Settings:
         return {
             "environment": self.environment,
             "vault_path": str(self.vault_path),
+            "runtime_path": str(self.runtime_path),
             "inbox_dir": self.inbox_dir.as_posix(),
             "allowed_write_dirs": [item.as_posix() for item in self.allowed_write_dirs],
             "dry_run": self.dry_run,
             "log_level": self.log_level,
+            "queue_max_attempts": self.queue_max_attempts,
+            "queue_lease_seconds": self.queue_lease_seconds,
             "telegram_configured": self.telegram_configured,
             "openai_configured": self.openai_configured,
             "llm_provider": self.llm_provider,
