@@ -53,9 +53,21 @@ def inspect_settings(settings: Settings) -> list[Check]:
         checks.append(Check("OK", "runtime", f"Runtime directory is writable: {runtime}"))
 
     if settings.telegram_configured:
-        checks.append(Check("WARNING", "telegram", "A Telegram token is present but the adapter is not implemented"))
+        checks.append(
+            Check(
+                "WARNING",
+                "telegram",
+                "A Telegram token is visible to the worker; keep it only in the OpenClaw environment",
+            )
+        )
     else:
-        checks.append(Check("OK", "telegram", "Telegram adapter is disabled"))
+        checks.append(
+            Check(
+                "OK",
+                "telegram",
+                "Telegram token is absent from worker configuration as expected",
+            )
+        )
 
     if settings.openai_configured:
         checks.append(Check("WARNING", "openai", "An OpenAI key is present but the adapter is not implemented"))

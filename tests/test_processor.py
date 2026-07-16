@@ -89,6 +89,28 @@ class QueueProcessorTests(unittest.TestCase):
         self.assertEqual(queue.summary().completed, 1)
         self.assertEqual(queue.summary().pending, 0)
 
+    def test_process_request_leaves_an_older_capture_pending(self) -> None:
+        _, queue, _, processor = self.components(dry_run=False)
+        older_id = uuid.UUID("00000000-0000-4000-8000-000000000001")
+        queue.enqueue(
+            CaptureEvent.create(
+                title="Older",
+                text="First fixture",
+                source="local",
+                actor_id="test-owner",
+                request_id=older_id,
+                created_at=FIXED_TIME - timedelta(seconds=1),
+            )
+        )
+        queue.enqueue(self.event())
+
+        result = processor.process_request(FIXED_ID)
+
+        self.assertEqual(result.state, ProcessingState.COMPLETED)
+        self.assertEqual(result.request_id, FIXED_ID)
+        self.assertEqual(queue.summary().pending, 1)
+        self.assertEqual(queue.summary().completed, 1)
+
     def test_retry_after_note_write_reuses_identical_file(self) -> None:
         settings, queue, service, processor = self.components(dry_run=True)
         queue.enqueue(self.event())

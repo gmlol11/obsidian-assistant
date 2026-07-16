@@ -45,9 +45,38 @@ class QueueProcessor:
         self.worker_id = worker_id or f"{socket.gethostname()}-{uuid.uuid4().hex[:12]}"
 
     def process_next(self, *, force_apply: bool = False) -> ProcessResult:
+        return self._process(force_apply=force_apply)
+
+    def process_request(
+        self,
+        request_id: uuid.UUID,
+        *,
+        force_apply: bool = False,
+    ) -> ProcessResult:
+        """Process only the requested pending capture."""
+
+        return self._process(request_id=request_id, force_apply=force_apply)
+
+    def _process(
+        self,
+        *,
+        request_id: uuid.UUID | None = None,
+        force_apply: bool = False,
+    ) -> ProcessResult:
         preview_only = self.settings.dry_run and not force_apply
         try:
-            record = self.queue.peek_pending() if preview_only else self.queue.claim_next(self.worker_id)
+            if request_id is None:
+                record = (
+                    self.queue.peek_pending()
+                    if preview_only
+                    else self.queue.claim_next(self.worker_id)
+                )
+            else:
+                record = (
+                    self.queue.peek_request(request_id)
+                    if preview_only
+                    else self.queue.claim_request(request_id, self.worker_id)
+                )
         except QueueDataError as exc:
             self.queue.quarantine_corrupt(exc.path)
             return ProcessResult(
