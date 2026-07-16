@@ -1,0 +1,38 @@
+name: Предложение
+description: Предложить новую возможность или изменение поведения
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Проблема
+      description: Какую пользовательскую задачу нужно решить?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Предлагаемое решение
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Риски и границы доступа
+      description: Нужны ли сеть, shell, новые папки vault, изменение или удаление файлов?
+    validations:
+      required: true
+  - type: dropdown
+    id: roadmap
+    attributes:
+      label: Этап дорожной карты
+      options:
+        - Foundation
+        - Capture
+        - Processing
+        - Daily brief
+        - Mac mini deployment
+        - Не определён
+    validations:
+      required: true

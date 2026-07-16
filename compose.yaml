@@ -1,0 +1,19 @@
+services:
+  vault-worker:
+    build:
+      context: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OBSIDIAN_VAULT_PATH: /vault
+    volumes:
+      - "${HOST_VAULT_PATH:-./tests/fixtures/vault}:/vault"
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

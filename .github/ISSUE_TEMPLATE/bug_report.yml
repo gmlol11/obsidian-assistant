@@ -1,0 +1,46 @@
+name: Ошибка
+description: Сообщить о воспроизводимой ошибке без публикации личных данных
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Не прикладывайте токены, реальные заметки и внутренние пути. Уязвимости сообщайте приватно по SECURITY.md.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Что произошло
+      description: Опишите фактическое и ожидаемое поведение.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Как воспроизвести
+      description: Используйте тестовый vault и обезличенные данные.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия или commit
+    validations:
+      required: true
+  - type: dropdown
+    id: write_scope
+    attributes:
+      label: Затронута запись в vault?
+      options:
+        - Нет
+        - Только dry-run
+        - Да, тестовый vault
+        - Да, реальный vault
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Проверка данных
+      options:
+        - label: Я удалил секреты, личные заметки и чувствительные пути.
+          required: true

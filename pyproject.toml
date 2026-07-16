@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-assistant"
+version = "0.1.0"
+description = "Local-first automation bridge for safely organizing inputs in an Obsidian vault."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "gmlol11" }]
+keywords = ["obsidian", "automation", "local-first", "openclaw", "telegram"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business :: Scheduling",
+]
+dependencies = []
+
+[project.scripts]
+obsidian-assistant = "obsidian_assistant.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+obsidian_assistant = ["py.typed"]
