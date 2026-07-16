@@ -1,0 +1,68 @@
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback",
+    auth: {
+      mode: "token",
+      token: "${OPENCLAW_GATEWAY_TOKEN}",
+    },
+  },
+
+  session: {
+    dmScope: "per-channel-peer",
+  },
+
+  commands: {
+    restart: false,
+    ownerAllowFrom: ["telegram:${TELEGRAM_OWNER_ID}"],
+  },
+
+  tools: {
+    profile: "messaging",
+    deny: [
+      "group:automation",
+      "group:runtime",
+      "group:fs",
+      "gateway",
+      "cron",
+      "sessions_spawn",
+      "sessions_send",
+    ],
+    fs: {
+      workspaceOnly: true,
+    },
+    exec: {
+      security: "deny",
+      ask: "always",
+    },
+    elevated: {
+      enabled: false,
+    },
+  },
+
+  channels: {
+    telegram: {
+      enabled: true,
+      dmPolicy: "allowlist",
+      allowFrom: ["${TELEGRAM_OWNER_ID}"],
+      groupPolicy: "disabled",
+      configWrites: false,
+    },
+  },
+
+  plugins: {
+    allow: ["telegram", "obsidian-assistant-capture"],
+    entries: {
+      "obsidian-assistant-capture": {
+        enabled: true,
+        config: {
+          bridgeCommand: "${OBSIDIAN_ASSISTANT_COMMAND}",
+          workerEnvFile: "${OBSIDIAN_WORKER_ENV_FILE}",
+          ownerIds: ["${TELEGRAM_OWNER_ID}"],
+          processImmediately: true,
+          timeoutMs: 15000,
+        },
+      },
+    },
+  },
+}

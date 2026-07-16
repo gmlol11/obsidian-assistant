@@ -18,6 +18,11 @@
 - идемпотентность по `request_id` и fingerprint события;
 - повторные попытки, processing lease, восстановление после сбоя и ручной retry;
 - CLI-команды `queue enqueue`, `status`, `process`, `retry` и `recover`;
+- строгий локальный `bridge` для OpenClaw с JSON через stdin;
+- обработка конкретного request ID без захвата более старой заметки;
+- OpenClaw-плагин с нативной owner-only командой `/capture`;
+- безопасные шаблоны Telegram long polling, loopback Gateway и разделённых env-файлов;
+- ADR и runbook для Telegram/OpenClaw;
 
 ### Security
 
@@ -27,4 +32,7 @@
 - секреты исключены из Git;
 - завершённые квитанции не хранят payload или actor ID;
 - runtime запрещено размещать внутри vault или над ним;
-- восстановление после уже выполненной записи принимает только полностью идентичный файл.
+- восстановление после уже выполненной записи принимает только полностью идентичный файл;
+- Telegram sender проходит allowlist OpenClaw и отдельный `ownerIds` плагина;
+- Capture bridge запускается без shell и без наследования Telegram, Gateway или LLM-секретов;
+- Telegram token исключён из worker-конфигурации.

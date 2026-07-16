@@ -1,0 +1,53 @@
+{
+  "name": "@gmlol11/openclaw-obsidian-capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Owner-only OpenClaw /capture bridge for Obsidian Assistant.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "check": "npm run test",
+    "prepack": "npm run build"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/plugin.js",
+    "dist/plugin.d.ts",
+    "dist/bridge-process.js",
+    "dist/bridge-process.d.ts",
+    "dist/types.js",
+    "dist/types.d.ts",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.7.1 <2026.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.7.1",
+      "minGatewayVersion": "2026.7.1"
+    },
+    "build": {
+      "openclawVersion": "2026.7.1",
+      "pluginSdkVersion": "2026.7.1"
+    }
+  }
+}

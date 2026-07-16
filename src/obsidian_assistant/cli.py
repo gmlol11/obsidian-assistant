@@ -10,6 +10,12 @@ from typing import Sequence
 
 from obsidian_assistant.config import ConfigError, Settings, load_env_file
 from obsidian_assistant.diagnostics import inspect_settings
+from obsidian_assistant.intake.bridge import (
+    MAX_BRIDGE_INPUT_BYTES,
+    BridgeValidationError,
+    handle_bridge_capture,
+    parse_bridge_input,
+)
 from obsidian_assistant.intake.events import CaptureEvent, EventValidationError
 from obsidian_assistant.intake.processor import ProcessingState, QueueProcessor
 from obsidian_assistant.intake.queue import FileQueue, QueueError
@@ -72,6 +78,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Return stale processing leases to pending after an interrupted worker.",
     )
     recover.add_argument("--force", action="store_true")
+
+    commands.add_parser(
+        "bridge",
+        help="Read one strict OpenClaw capture envelope from stdin.",
+    )
     return parser
 
 
@@ -182,6 +193,14 @@ def _queue_command(settings: Settings, args: argparse.Namespace) -> int:
     raise QueueError(f"Unknown queue command: {args.queue_command}")
 
 
+def _bridge(settings: Settings) -> int:
+    encoded = sys.stdin.buffer.read(MAX_BRIDGE_INPUT_BYTES + 1)
+    request = parse_bridge_input(encoded)
+    response = handle_bridge_capture(settings, request)
+    print(json.dumps(response.to_dict(), ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -197,7 +216,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _capture(settings, args)
         if args.command == "queue":
             return _queue_command(settings, args)
+        if args.command == "bridge":
+            return _bridge(settings)
     except (
+        BridgeValidationError,
         ConfigError,
         CaptureError,
         EventValidationError,

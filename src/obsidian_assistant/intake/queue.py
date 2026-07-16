@@ -129,6 +129,13 @@ class QueueSummary:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class RequestStatus:
+    request_id: uuid.UUID
+    state: QueueState
+    note_path: str | None = None
+
+
 class FileQueue:
     """A single-host, crash-recoverable filesystem queue.
 
@@ -179,6 +186,18 @@ class FileQueue:
         with self._lock():
             return self._oldest_pending()
 
+    def peek_request(self, request_id: uuid.UUID) -> QueueRecord | None:
+        """Return one pending request without exposing other queue entries."""
+
+        with self._lock():
+            path = self._record_path(self.pending_dir, request_id)
+            if not path.exists():
+                return None
+            record = self._load_record(path)
+            if record.status is not QueueState.PENDING:
+                raise QueueDataError(path, "Pending record has an invalid status")
+            return record
+
     def claim_next(self, worker_id: str) -> QueueRecord | None:
         if not worker_id.strip():
             raise QueueError("worker_id cannot be empty")
@@ -186,21 +205,47 @@ class FileQueue:
             record = self._oldest_pending()
             if record is None:
                 return None
+            return self._claim_record(record, worker_id)
 
-            source = self._record_path(self.pending_dir, record.request_id)
-            target = self._record_path(self.processing_dir, record.request_id)
-            if os.path.lexists(target):
-                raise QueueError("Request is already present in processing")
-            os.replace(source, target)
-            claimed = replace(
-                record,
-                status=QueueState.PROCESSING,
-                attempts=record.attempts + 1,
-                claimed_at=self._now(),
-                worker_id=worker_id.strip(),
-            )
-            self._write_json_atomic(target, claimed.to_dict())
-            return claimed
+    def claim_request(self, request_id: uuid.UUID, worker_id: str) -> QueueRecord | None:
+        """Claim a specific request so an interactive caller gets its own result."""
+
+        if not worker_id.strip():
+            raise QueueError("worker_id cannot be empty")
+        with self._lock():
+            path = self._record_path(self.pending_dir, request_id)
+            if not path.exists():
+                return None
+            record = self._load_record(path)
+            if record.status is not QueueState.PENDING:
+                raise QueueDataError(path, "Pending record has an invalid status")
+            return self._claim_record(record, worker_id)
+
+    def request_status(self, request_id: uuid.UUID) -> RequestStatus | None:
+        """Return metadata-only state for one request."""
+
+        with self._lock():
+            for state, directory in (
+                (QueueState.COMPLETED, self.completed_dir),
+                (QueueState.PROCESSING, self.processing_dir),
+                (QueueState.PENDING, self.pending_dir),
+                (QueueState.QUARANTINE, self.quarantine_dir),
+            ):
+                path = self._record_path(directory, request_id)
+                if not path.exists():
+                    continue
+                if state is QueueState.COMPLETED:
+                    receipt = self._load_receipt(path, request_id)
+                    return RequestStatus(
+                        request_id=request_id,
+                        state=state,
+                        note_path=str(receipt["note_path"]),
+                    )
+                record = self._load_record(path)
+                if record.status is not state:
+                    raise QueueDataError(path, "Queue record status does not match its directory")
+                return RequestStatus(request_id=request_id, state=state)
+        return None
 
     def complete(self, record: QueueRecord, note_path: str) -> None:
         if record.status is not QueueState.PROCESSING:
@@ -380,6 +425,25 @@ class FileQueue:
             return None
         return min(records, key=lambda item: (item.enqueued_at, str(item.request_id)))
 
+    def _claim_record(self, record: QueueRecord, worker_id: str) -> QueueRecord:
+        normalized_worker_id = worker_id.strip()
+        if not normalized_worker_id:
+            raise QueueError("worker_id cannot be empty")
+        source = self._record_path(self.pending_dir, record.request_id)
+        target = self._record_path(self.processing_dir, record.request_id)
+        if os.path.lexists(target):
+            raise QueueError("Request is already present in processing")
+        os.replace(source, target)
+        claimed = replace(
+            record,
+            status=QueueState.PROCESSING,
+            attempts=record.attempts + 1,
+            claimed_at=self._now(),
+            worker_id=normalized_worker_id,
+        )
+        self._write_json_atomic(target, claimed.to_dict())
+        return claimed
+
     def _find_request(self, request_id: uuid.UUID) -> tuple[QueueState, str] | None:
         for state, directory in (
             (QueueState.COMPLETED, self.completed_dir),
@@ -483,6 +547,27 @@ class FileQueue:
             or any(character not in "0123456789abcdef" for character in fingerprint)
         ):
             raise QueueDataError(path, "Completed receipt has an invalid event_sha256")
+        source = raw.get("source")
+        if not isinstance(source, str) or not source:
+            raise QueueDataError(path, "Completed receipt has an invalid source")
+        attempts = raw.get("attempts")
+        manual_retries = raw.get("manual_retries")
+        if type(attempts) is not int or attempts < 0:
+            raise QueueDataError(path, "Completed receipt has invalid attempts")
+        if type(manual_retries) is not int or manual_retries < 0:
+            raise QueueDataError(path, "Completed receipt has invalid manual_retries")
+        self._parse_record_time(path, raw.get("completed_at"), "completed_at")
+        note_path = raw.get("note_path")
+        if not isinstance(note_path, str):
+            raise QueueDataError(path, "Completed receipt has an invalid note_path")
+        parsed_note_path = PurePosixPath(note_path)
+        if (
+            not note_path
+            or "\\" in note_path
+            or parsed_note_path.is_absolute()
+            or any(part in {"", ".", ".."} for part in parsed_note_path.parts)
+        ):
+            raise QueueDataError(path, "Completed receipt has an unsafe note_path")
         return raw
 
     @staticmethod

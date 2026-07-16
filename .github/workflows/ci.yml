@@ -42,3 +42,28 @@ jobs:
 
       - name: Build container
         run: docker build --tag obsidian-assistant:test .
+
+  openclaw-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up supported Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.15.0"
+          cache: npm
+          cache-dependency-path: integrations/openclaw-capture/package-lock.json
+
+      - name: Install locked plugin dependencies
+        working-directory: integrations/openclaw-capture
+        run: npm ci
+
+      - name: Type-check against OpenClaw and run plugin tests
+        working-directory: integrations/openclaw-capture
+        run: npm run check
+
+      - name: Verify package contents
+        working-directory: integrations/openclaw-capture
+        run: npm pack --dry-run

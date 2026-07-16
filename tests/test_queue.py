@@ -69,6 +69,35 @@ class FileQueueTests(unittest.TestCase):
         self.assertNotIn("actor_id", receipt)
         self.assertNotIn("private fixture text", receipt_text)
         self.assertEqual(self.queue.summary().processing, 0)
+        status = self.queue.request_status(FIXED_ID)
+        assert status is not None
+        self.assertEqual(status.state, QueueState.COMPLETED)
+        self.assertEqual(status.note_path, "00 Inbox/example.md")
+
+    def test_specific_claim_does_not_take_an_older_request(self) -> None:
+        older_id = uuid.UUID("00000000-0000-4000-8000-000000000001")
+        older = CaptureEvent.create(
+            title="Older",
+            text="First fixture",
+            source="local",
+            actor_id="test-owner",
+            request_id=older_id,
+            created_at=FIXED_TIME,
+        )
+        self.queue.enqueue(older)
+        self.clock.value += timedelta(seconds=1)
+        self.queue.enqueue(self.event())
+
+        claimed = self.queue.claim_request(FIXED_ID, "interactive-worker")
+
+        assert claimed is not None
+        older_status = self.queue.request_status(older_id)
+        target_status = self.queue.request_status(FIXED_ID)
+        assert older_status is not None
+        assert target_status is not None
+        self.assertEqual(claimed.request_id, FIXED_ID)
+        self.assertEqual(older_status.state, QueueState.PENDING)
+        self.assertEqual(target_status.state, QueueState.PROCESSING)
 
     def test_failure_retries_then_quarantines_and_can_be_retried_manually(self) -> None:
         self.queue.enqueue(self.event())

@@ -3,6 +3,7 @@
 ## Требования
 
 - Python 3.12+;
+- npm для сборки OpenClaw-плагина;
 - Git;
 - Docker — опционально;
 - отдельный тестовый vault.
@@ -11,6 +12,7 @@
 
 ```bash
 cp .env.example .env
+cd integrations/openclaw-capture && npm ci && cd ../..
 make check
 make doctor
 make demo
@@ -74,6 +76,14 @@ docker compose run --rm vault-worker queue status
 make test
 ```
 
+Полная проверка, включая TypeScript-контракт с закреплённым OpenClaw и тесты плагина:
+
+```bash
+make check
+```
+
+Локальный Node 20 способен выполнить текущую сборку тестов, но не является поддерживаемым runtime OpenClaw. Реальный Gateway требует диапазон Node из `integrations/openclaw-capture/package.json`.
+
 Основные обязательные классы тестов:
 
 - конфигурация по умолчанию безопасна;
@@ -85,6 +95,8 @@ make test
 - завершённая квитанция не содержит полный payload;
 - временная ошибка повторяется до лимита, затем уходит в карантин;
 - восстановление после записи заметки не создаёт дубликат;
+- посторонний Telegram sender не вызывает bridge;
+- bridge не возвращает текст заметки и отклоняет небезопасный относительный путь;
 - frontmatter и Markdown имеют ожидаемый формат.
 
 ## Добавление новой операции записи
