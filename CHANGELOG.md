@@ -23,6 +23,7 @@
 - OpenClaw-плагин с нативной owner-only командой `/capture`;
 - безопасные шаблоны Telegram long polling, loopback Gateway и разделённых env-файлов;
 - ADR и runbook для Telegram/OpenClaw;
+- версионированный handoff-чек-лист для развёртывания на Mac mini в новой сессии;
 
 ### Security
 

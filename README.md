@@ -112,6 +112,7 @@ make check
 - [Дорожная карта](docs/roadmap.md)
 - [Разработка](docs/development.md)
 - [Развёртывание на Mac mini](docs/deployment-macos.md)
+- [Handoff для начала развёртывания на Mac mini](docs/handoffs/2026-07-16-mac-mini-deployment.md)
 - [Эксплуатация](docs/operations.md)
 - [Модель угроз](docs/threat-model.md)
 - [Архитектурные решения](docs/decisions/README.md)
