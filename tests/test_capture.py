@@ -8,7 +8,7 @@ from pathlib import Path
 
 from obsidian_assistant.config import Settings
 from obsidian_assistant.services.capture import CaptureCommand, CaptureError, CaptureService
-from obsidian_assistant.vault.policy import VaultPolicy
+from obsidian_assistant.vault.policy import ExistingTargetError, VaultPolicy
 from obsidian_assistant.vault.writer import VaultWriter
 
 
@@ -54,7 +54,7 @@ class CaptureServiceTests(unittest.TestCase):
         self.assertTrue(result.applied)
         self.assertEqual(
             result.relative_path.as_posix(),
-            "00 Inbox/20260716T093000000000Z-12345678.md",
+            "00 Inbox/20260716T093000000000Z-12345678123456781234567812345678.md",
         )
         self.assertIn("created: 2026-07-16", content)
         self.assertIn('source: "local"', content)
@@ -74,6 +74,37 @@ class CaptureServiceTests(unittest.TestCase):
     def test_invalid_source_is_rejected(self) -> None:
         with self.assertRaisesRegex(CaptureError, "Source"):
             self.service(dry_run=True).capture(CaptureCommand("Idea", "Text", "telegram/user"))
+
+    def test_identical_existing_file_is_accepted_only_when_explicitly_allowed(self) -> None:
+        service = self.service(dry_run=True)
+        first = service.capture(CaptureCommand("Idea", "Crash-safe retry"), force_apply=True)
+        second = service.capture(
+            CaptureCommand("Idea", "Crash-safe retry"),
+            force_apply=True,
+            capture_id=FIXED_ID,
+            created_at=FIXED_TIME,
+            allow_identical_existing=True,
+        )
+
+        self.assertTrue(first.applied)
+        self.assertFalse(second.applied)
+        self.assertTrue(second.unchanged_existing)
+
+    def test_identical_retry_never_follows_target_symlink(self) -> None:
+        service = self.service(dry_run=True)
+        first = service.capture(CaptureCommand("Idea", "Crash-safe retry"), force_apply=True)
+        outside = Path(self.temporary.name) / "outside.md"
+        first.absolute_path.replace(outside)
+        first.absolute_path.symlink_to(outside)
+
+        with self.assertRaises(ExistingTargetError):
+            service.capture(
+                CaptureCommand("Idea", "Crash-safe retry"),
+                force_apply=True,
+                capture_id=FIXED_ID,
+                created_at=FIXED_TIME,
+                allow_identical_existing=True,
+            )
 
 
 if __name__ == "__main__":

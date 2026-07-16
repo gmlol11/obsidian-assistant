@@ -42,6 +42,16 @@ def inspect_settings(settings: Settings) -> list[Check]:
     else:
         checks.append(Check("WARNING", "write-mode", "Dry-run is disabled; capture writes by default"))
 
+    runtime = settings.runtime_path
+    if not runtime.exists():
+        checks.append(Check("WARNING", "runtime", f"Runtime directory will be created on first queue use: {runtime}"))
+    elif not runtime.is_dir():
+        checks.append(Check("ERROR", "runtime", f"Runtime path is not a directory: {runtime}"))
+    elif not os.access(runtime, os.W_OK):
+        checks.append(Check("ERROR", "runtime", f"Runtime directory is not writable: {runtime}"))
+    else:
+        checks.append(Check("OK", "runtime", f"Runtime directory is writable: {runtime}"))
+
     if settings.telegram_configured:
         checks.append(Check("WARNING", "telegram", "A Telegram token is present but the adapter is not implemented"))
     else:
